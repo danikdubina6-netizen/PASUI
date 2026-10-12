@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 from aiogram import Bot, Dispatcher, F, types
+from aiogram.filters import Command
 from faster_whisper import WhisperModel
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -12,14 +13,21 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Используем модель 'small' — она в разы точнее 'tiny', отлично понимает русский и украинский
-print("Загрузка продвинутой модели Whisper...")
-whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
-print("Продвинутая модель успешно загружена!")
+# Используем продвинутую модель 'medium' для максимальной точности
+print("Загрузка мощной модели Whisper (medium)...")
+whisper_model = WhisperModel("medium", device="cpu", compute_type="int8")
+print("Модель успешно загружена!")
+
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message):
+    await message.answer(
+        "👋 **Привет! Я продвинутый расшифрователь голосовых и видеокружочков.**\n\n"
+        "Просто отправь мне любое голосовое сообщение или видеозаметку, и я переведу их в текст максимально точно!"
+    )
 
 @dp.message(F.voice | F.video_note)
 async def handle_audio(message: types.Message):
-    status_msg = await message.answer("🎧 Слушаю и расшифровываю...")
+    status_msg = await message.answer("🎧 Внимательно слушаю и расшифровываю...")
     
     file_id = message.voice.file_id if message.voice else message.video_note.file_id
     file = await bot.get_file(file_id)
@@ -28,14 +36,13 @@ async def handle_audio(message: types.Message):
     await bot.download_file(file.file_path, input_file)
     
     try:
-        # Передаем initial_prompt, чтобы Whisper не галлюцинировал иероглифами на тишине/помехах
-        segments, info = whisper_model.transcribe(
+        segments, _ = whisper_model.transcribe(
             input_file,
             beam_size=5,
             best_of=5,
-            vad_filter=True, # Включаем фильтр тишины и шумов
+            vad_filter=True,
             vad_parameters=dict(min_silence_duration_ms=500),
-            initial_prompt="Расшифровка голосового сообщения на русском или украинском языке."
+            initial_prompt="Точная расшифровка разговорной речи на русском языке без галлюцинаций."
         )
         
         text = " ".join([segment.text for segment in segments]).strip()
@@ -43,7 +50,7 @@ async def handle_audio(message: types.Message):
         if text:
             await message.reply(f"📜 **Расшифровка:**\n\n{text}")
         else:
-            await message.reply("⚠️ Не удалось разобрать слова (тишина или слишком сильный шум).")
+            await message.reply("⚠️ Не удалось разобрать слова. Возможно, запись слишком тихая или шумная.")
     except Exception as e:
         await message.reply(f"❌ Ошибка при обработке: {e}")
     finally:
