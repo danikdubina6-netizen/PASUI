@@ -21,13 +21,13 @@ print("Модель успешно загружена!")
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer(
-        "👋 **Привет! Я продвинутый расшифрователь голосовых и видеокружочков.**\n\n"
+        "Привет! Я продвинутый расшифрователь голосовых и видеокружочков.\n\n"
         "Просто отправь мне любое голосовое сообщение или видеозаметку, и я переведу их в текст максимально точно!"
     )
 
 @dp.message(F.voice | F.video_note)
 async def handle_audio(message: types.Message):
-    status_msg = await message.answer("🎧 Внимательно слушаю и расшифровываю...")
+    status_msg = await message.answer("Слушаю и расшифровываю...")
     
     file_id = message.voice.file_id if message.voice else message.video_note.file_id
     file = await bot.get_file(file_id)
@@ -48,11 +48,11 @@ async def handle_audio(message: types.Message):
         text = " ".join([segment.text for segment in segments]).strip()
         
         if text:
-            await message.reply(f"📜 **Расшифровка:**\n\n{text}")
+            await message.reply(f"Расшифровка:\n\n{text}")
         else:
-            await message.reply("⚠️ Не удалось разобрать слова. Возможно, запись слишком тихая или шумная.")
+            await message.reply("Не удалось разобрать слова. Возможно, запись слишком тихая или шумная.")
     except Exception as e:
-        await message.reply(f"❌ Ошибка при обработке: {e}")
+        await message.reply(f"Ошибка при обработке: {e}")
     finally:
         if os.path.exists(input_file):
             os.remove(input_file)
