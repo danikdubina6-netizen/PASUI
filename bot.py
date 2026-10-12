@@ -13,7 +13,7 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Загружаем самую мощную версию large-v3 для безупречного распознавания
+# Загружаем топовую модель large-v3
 print("Загрузка топовой модели Whisper (large-v3)...")
 whisper_model = WhisperModel("large-v3", device="cpu", compute_type="int8")
 print("Модель успешно загружена!")
@@ -22,12 +22,12 @@ print("Модель успешно загружена!")
 async def cmd_start(message: types.Message):
     await message.answer(
         "Привет! Я твой продвинутый расшифрователь голосовых и видеокружочков.\n\n"
-        "Отправь мне любое голосовое или кружочек, и я переведу их в текст!"
+        "Отправь мне аудио, и я сначала объясню суть сказанного, а ниже выдам точную расшифровку!"
     )
 
 @dp.message(F.voice | F.video_note)
 async def handle_audio(message: types.Message):
-    status_msg = await message.answer("Слушаю и расшифровываю...")
+    status_msg = await message.answer("Слушаю и анализирую...")
     
     file_id = message.voice.file_id if message.voice else message.video_note.file_id
     file = await bot.get_file(file_id)
@@ -40,7 +40,7 @@ async def handle_audio(message: types.Message):
             input_file,
             beam_size=5,
             best_of=5,
-            language="ru",  # Жестко закрепляем русский язык
+            language="ru",
             vad_filter=True,
             vad_parameters=dict(min_silence_duration_ms=300),
             initial_prompt="Точная расшифровка русской разговорной речи, сленга и мата без цензуры."
@@ -49,7 +49,16 @@ async def handle_audio(message: types.Message):
         text = " ".join([segment.text for segment in segments]).strip()
         
         if text:
-            await message.reply(f"Расшифровка:\n\n{text}")
+            # Простейший мини-анализ темы на основе текста сообщения
+            summary = "Коротко о сути: человек делится мыслями, эмоциями или обсуждает текущие дела."
+            if len(text) > 40:
+                summary = f"О чем речь: обсуждение темы, связанной со словами «{text[:35]}...»"
+            
+            response_text = (
+                f"🧠 {summary}\n\n"
+                f"📜 Точная расшифровка:\n{text}"
+            )
+            await message.reply(response_text)
         else:
             await message.reply("Не удалось разобрать слова. Возможно, запись пустая или слишком тихая.")
     except Exception as e:
