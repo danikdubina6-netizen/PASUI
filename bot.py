@@ -3,7 +3,7 @@ import os
 import sys
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
-from faster_whisper import WhisperModel
+from funasr import AutoModel
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
@@ -13,15 +13,20 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-print("Загрузка топовой модели Whisper (large-v3)...")
-whisper_model = WhisperModel("large-v3", device="cpu", compute_type="int8")
+print("Загрузка продвинутой модели SenseVoiceSmall...")
+# Загружаем модель SenseVoice, которая идеально понимает живую речь и сленг
+model = AutoModel(
+    model="iic/SenseVoiceSmall",
+    device="cpu",
+    disable_update=True
+)
 print("Модель успешно загружена!")
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer(
-        "Привет! Я твой ИИ-расшифрователь голосовых, кружочков и песен.\n\n"
-        "Отправь мне аудио, и я выдам чистый текст!"
+        "Привет! Я твой ИИ-расшифрователь на современной модели SenseVoice.\n\n"
+        "Отправь мне аудио, и я выдам чистый текст без ошибок!"
     )
 
 @dp.message(F.voice | F.video_note | F.audio)
@@ -41,25 +46,26 @@ async def handle_audio(message: types.Message):
     await bot.download_file(file.file_path, input_file)
     
     try:
-        segments, _ = whisper_model.transcribe(
-            input_file,
-            beam_size=10,
-            best_of=10,
-            temperature=0.0,
-            language="ru",
-            initial_prompt="Максимально точная, пословная расшифровка русской речи, сленга, песен и мата без цензуры."
+        # Генерация расшифровки через SenseVoice
+        res = model.generate(
+            input=input_file,
+            language="auto",
+            use_itn=True,
         )
         
-        text = " ".join([segment.text for segment in segments]).strip()
-        
-        # Фильтруем случайные артефакты
-        if "DimaTorzok" in text or "субтитры" in text.lower():
-            text = ""
+        text = ""
+        if res and len(res) > 0:
+            text = res[0].get("text", "").strip()
+            
+        # Убираем возможные теги эмоций модели, если они появятся (например <|RU|>)
+        for tag in ["<|RU|>", "<|EN|>", "<|ZH|>", "<|Speech|>", "<|Applause|>", "<|BGM|>"]:
+            text = text.replace(tag, "")
+        text = text.strip()
 
         if text:
             await message.reply(text)
         else:
-            await message.reply("Не удалось разобрать слова. Похоже, запись пустая или чисто инструментальная.")
+            await message.reply("Не удалось разобрать слова. Запись пустая или слишком тихая.")
     except Exception as e:
         await message.reply(f"Ошибка при обработке: {e}")
     finally:
