@@ -4,7 +4,6 @@ import sys
 from aiogram import Bot, Dispatcher, F, types
 from faster_whisper import WhisperModel
 
-# Получаем токен из переменных окружения GitHub
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 if not BOT_TOKEN:
@@ -13,11 +12,10 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Используем модель 'tiny' или 'base' для быстрой работы на бесплатном CPU
-model_size = "tiny"
-print("Загрузка модели Whisper...")
-whisper_model = WhisperModel(model_size, device="cpu", compute_type="int8")
-print("Модель успешно загружена!")
+# Используем модель 'small' — она в разы точнее 'tiny', отлично понимает русский и украинский
+print("Загрузка продвинутой модели Whisper...")
+whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
+print("Продвинутая модель успешно загружена!")
 
 @dp.message(F.voice | F.video_note)
 async def handle_audio(message: types.Message):
@@ -30,13 +28,22 @@ async def handle_audio(message: types.Message):
     await bot.download_file(file.file_path, input_file)
     
     try:
-        segments, _ = whisper_model.transcribe(input_file, beam_size=5)
+        # Передаем initial_prompt, чтобы Whisper не галлюцинировал иероглифами на тишине/помехах
+        segments, info = whisper_model.transcribe(
+            input_file,
+            beam_size=5,
+            best_of=5,
+            vad_filter=True, # Включаем фильтр тишины и шумов
+            vad_parameters=dict(min_silence_duration_ms=500),
+            initial_prompt="Расшифровка голосового сообщения на русском или украинском языке."
+        )
+        
         text = " ".join([segment.text for segment in segments]).strip()
         
         if text:
             await message.reply(f"📜 **Расшифровка:**\n\n{text}")
         else:
-            await message.reply("⚠️ Не удалось разобрать слова.")
+            await message.reply("⚠️ Не удалось разобрать слова (тишина или слишком сильный шум).")
     except Exception as e:
         await message.reply(f"❌ Ошибка при обработке: {e}")
     finally:
@@ -50,4 +57,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-  
+    
