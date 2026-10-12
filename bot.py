@@ -3,7 +3,7 @@ import os
 import sys
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
-from funasr import AutoModel
+from faster_whisper import WhisperModel
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
@@ -13,20 +13,16 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Загружаем ультрасовременную модель SenseVoiceSmall
-print("Загрузка современной модели SenseVoice...")
-model = AutoModel(
-    model="iic/SenseVoiceSmall",
-    device="cpu",
-    disable_update=True
-)
+# Загружаем самую мощную версию large-v3 для безупречного распознавания
+print("Загрузка топовой модели Whisper (large-v3)...")
+whisper_model = WhisperModel("large-v3", device="cpu", compute_type="int8")
 print("Модель успешно загружена!")
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer(
-        "Привет! Я твой продвинутый ИИ-расшифрователь голосовых и видеокружочков.\n\n"
-        "Отправь мне любое голосовое или кружочек, и я переведу его в текст без ошибок и галлюцинаций!"
+        "Привет! Я твой продвинутый расшифрователь голосовых и видеокружочков.\n\n"
+        "Отправь мне любое голосовое или кружочек, и я переведу их в текст!"
     )
 
 @dp.message(F.voice | F.video_note)
@@ -40,21 +36,22 @@ async def handle_audio(message: types.Message):
     await bot.download_file(file.file_path, input_file)
     
     try:
-        # Распознаем речь с помощью SenseVoice
-        res = model.generate(
-            input=input_file,
-            language="auto", # Автоматически определяет язык (отлично понимает русский)
-            use_itn=True,    # Нормализация текста (красивые цифры, знаки)
+        segments, _ = whisper_model.transcribe(
+            input_file,
+            beam_size=5,
+            best_of=5,
+            language="ru",  # Жестко закрепляем русский язык
+            vad_filter=True,
+            vad_parameters=dict(min_silence_duration_ms=300),
+            initial_prompt="Точная расшифровка русской разговорной речи, сленга и мата без цензуры."
         )
         
-        text = ""
-        if res and len(res) > 0:
-            text = res[0].get("text", "").strip()
+        text = " ".join([segment.text for segment in segments]).strip()
         
         if text:
             await message.reply(f"Расшифровка:\n\n{text}")
         else:
-            await message.reply("Не удалось разобрать слова. Возможно, запись слишком тихая.")
+            await message.reply("Не удалось разобрать слова. Возможно, запись пустая или слишком тихая.")
     except Exception as e:
         await message.reply(f"Ошибка при обработке: {e}")
     finally:
