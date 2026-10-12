@@ -13,20 +13,20 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-print("Загрузка топовой модели Whisper (large-v3) на максимальных настройках...")
+print("Загрузка топовой модели Whisper (large-v3)...")
 whisper_model = WhisperModel("large-v3", device="cpu", compute_type="int8")
 print("Модель успешно загружена!")
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer(
-        "Привет! Я твой сверхточный ИИ-расшифрователь голосовых, кружочков и песен.\n\n"
-        "Отправь мне аудио, и я выдам максимально чёткую расшифровку слово в слово!"
+        "Привет! Я твой ИИ-расшифрователь голосовых, кружочков и песен.\n\n"
+        "Отправь мне аудио, и я выдам чистый текст!"
     )
 
 @dp.message(F.voice | F.video_note | F.audio)
 async def handle_audio(message: types.Message):
-    status_msg = await message.answer("Слушаю и максимально точно расшифровываю...")
+    status_msg = await message.answer("Слушаю и расшифровываю...")
     
     if message.voice:
         file_id = message.voice.file_id
@@ -43,9 +43,9 @@ async def handle_audio(message: types.Message):
     try:
         segments, _ = whisper_model.transcribe(
             input_file,
-            beam_size=10,       # Максимальная глубина поиска для идеальной точности
-            best_of=10,         # Перебор лучших вариантов трактовки
-            temperature=0.0,    # Отключаем «фантазию» нейросети, только чистый факт
+            beam_size=10,
+            best_of=10,
+            temperature=0.0,
             language="ru",
             initial_prompt="Максимально точная, пословная расшифровка русской речи, сленга, песен и мата без цензуры."
         )
@@ -57,14 +57,7 @@ async def handle_audio(message: types.Message):
             text = ""
 
         if text:
-            if len(text.split()) <= 3:
-                response_text = f"Сказано: {text}"
-            else:
-                response_text = (
-                    f"О чём речь: аудиозапись или песня со словами «{text[:50]}...»\n\n"
-                    f"Расшифровка:\n{text}"
-                )
-            await message.reply(response_text)
+            await message.reply(text)
         else:
             await message.reply("Не удалось разобрать слова. Похоже, запись пустая или чисто инструментальная.")
     except Exception as e:
