@@ -13,7 +13,6 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Загружаем топовую модель large-v3
 print("Загрузка топовой модели Whisper (large-v3)...")
 whisper_model = WhisperModel("large-v3", device="cpu", compute_type="int8")
 print("Модель успешно загружена!")
@@ -22,7 +21,7 @@ print("Модель успешно загружена!")
 async def cmd_start(message: types.Message):
     await message.answer(
         "Привет! Я твой продвинутый расшифрователь голосовых и видеокружочков.\n\n"
-        "Отправь мне аудио, и я сначала объясню суть сказанного, а ниже выдам точную расшифровку!"
+        "Отправь мне аудио, и я напишу, о чём идет речь, и выдам точный текст!"
     )
 
 @dp.message(F.voice | F.video_note)
@@ -48,19 +47,22 @@ async def handle_audio(message: types.Message):
         
         text = " ".join([segment.text for segment in segments]).strip()
         
+        # Фильтруем ложные галлюцинации, если они проскочили
+        if "DimaTorzok" in text or "субтитры" in text.lower():
+            text = ""
+
         if text:
-            # Простейший мини-анализ темы на основе текста сообщения
-            summary = "Коротко о сути: человек делится мыслями, эмоциями или обсуждает текущие дела."
-            if len(text) > 40:
-                summary = f"О чем речь: обсуждение темы, связанной со словами «{text[:35]}...»"
-            
-            response_text = (
-                f"🧠 {summary}\n\n"
-                f"📜 Точная расшифровка:\n{text}"
-            )
+            # Если текст короткий, то суть и расшифровка совпадают
+            if len(text.split()) <= 3:
+                response_text = f"Сказано: {text}"
+            else:
+                response_text = (
+                    f"О чём речь: обсуждение темы «{text[:50]}...»\n\n"
+                    f"Расшифровка:\n{text}"
+                )
             await message.reply(response_text)
         else:
-            await message.reply("Не удалось разобрать слова. Возможно, запись пустая или слишком тихая.")
+            await message.reply("Не удалось разобрать слова. Похоже, запись пустая или слишком короткая.")
     except Exception as e:
         await message.reply(f"Ошибка при обработке: {e}")
     finally:
