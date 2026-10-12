@@ -13,22 +13,28 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-print("Загрузка топовой модели Whisper (large-v3)...")
+print("Загрузка топовой модели Whisper (large-v3) на максимальных настройках...")
 whisper_model = WhisperModel("large-v3", device="cpu", compute_type="int8")
 print("Модель успешно загружена!")
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer(
-        "Привет! Я твой продвинутый расшифрователь голосовых и видеокружочков.\n\n"
-        "Отправь мне аудио, и я напишу, о чём идет речь, и выдам точный текст!"
+        "Привет! Я твой сверхточный ИИ-расшифрователь голосовых, кружочков и песен.\n\n"
+        "Отправь мне аудио, и я выдам максимально чёткую расшифровку слово в слово!"
     )
 
-@dp.message(F.voice | F.video_note)
+@dp.message(F.voice | F.video_note | F.audio)
 async def handle_audio(message: types.Message):
-    status_msg = await message.answer("Слушаю и анализирую...")
+    status_msg = await message.answer("Слушаю и максимально точно расшифровываю...")
     
-    file_id = message.voice.file_id if message.voice else message.video_note.file_id
+    if message.voice:
+        file_id = message.voice.file_id
+    elif message.video_note:
+        file_id = message.video_note.file_id
+    else:
+        file_id = message.audio.file_id
+
     file = await bot.get_file(file_id)
     
     input_file = f"temp_{message.from_user.id}.ogg"
@@ -37,32 +43,30 @@ async def handle_audio(message: types.Message):
     try:
         segments, _ = whisper_model.transcribe(
             input_file,
-            beam_size=5,
-            best_of=5,
+            beam_size=10,       # Максимальная глубина поиска для идеальной точности
+            best_of=10,         # Перебор лучших вариантов трактовки
+            temperature=0.0,    # Отключаем «фантазию» нейросети, только чистый факт
             language="ru",
-            vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=300),
-            initial_prompt="Точная расшифровка русской разговорной речи, сленга и мата без цензуры."
+            initial_prompt="Максимально точная, пословная расшифровка русской речи, сленга, песен и мата без цензуры."
         )
         
         text = " ".join([segment.text for segment in segments]).strip()
         
-        # Фильтруем ложные галлюцинации, если они проскочили
+        # Фильтруем случайные артефакты
         if "DimaTorzok" in text or "субтитры" in text.lower():
             text = ""
 
         if text:
-            # Если текст короткий, то суть и расшифровка совпадают
             if len(text.split()) <= 3:
                 response_text = f"Сказано: {text}"
             else:
                 response_text = (
-                    f"О чём речь: обсуждение темы «{text[:50]}...»\n\n"
+                    f"О чём речь: аудиозапись или песня со словами «{text[:50]}...»\n\n"
                     f"Расшифровка:\n{text}"
                 )
             await message.reply(response_text)
         else:
-            await message.reply("Не удалось разобрать слова. Похоже, запись пустая или слишком короткая.")
+            await message.reply("Не удалось разобрать слова. Похоже, запись пустая или чисто инструментальная.")
     except Exception as e:
         await message.reply(f"Ошибка при обработке: {e}")
     finally:
