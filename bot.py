@@ -4,28 +4,33 @@ import sys
 import uuid
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
-from faster_whisper import WhisperModel
+from groq import Groq
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 if not BOT_TOKEN:
     sys.exit("Ошибка: Переменная BOT_TOKEN не найдена!")
+if not GROQ_API_KEY:
+    sys.exit("Ошибка: Переменная GROQ_API_KEY не найдена!")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-print("Загрузка продвинутой модели Whisper Large V3 Turbo...")
-# Используем state-of-the-art модель: высокая скорость и максимальная точность без лишних слоев
-whisper_model = WhisperModel("large-v3-turbo", device="cpu", compute_type="int8")
-print("Модель успешно загружена!")
+# Инициализируем клиента Groq для работы с облачным Whisper
+groq_client = Groq(api_key=GROQ_API_KEY)
+print("Groq API клиент успешно инициализирован!")
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    await message.answer("Привет! Отправь голосовое, и я расшифрую его на турбо-модели.")
+    await message.answer(
+        "Привет! Бот работает на сверхбыстром Groq API (Whisper Large V3). "
+        "Отправь голосовое или аудио, и я выдам точный текст!"
+    )
 
 @dp.message(F.voice | F.video_note | F.audio)
 async def handle_audio(message: types.Message):
-    status_msg = await message.answer("Слушаю...")
+    status_msg = await message.answer("Молниеносная расшифровка через Groq...")
     
     if message.voice:
         file_id = message.voice.file_id
@@ -42,31 +47,24 @@ async def handle_audio(message: types.Message):
     await bot.download_file(file.file_path, input_file)
     
     try:
-        segments, _ = whisper_model.transcribe(
-            input_file,
-            beam_size=5,
-            best_of=5,
-            temperature=0.0,
-            language="ru",
-            vad_filter=True,  # С turbo-моделью фильтр работает идеально и не режет нужные слова
-            vad_parameters=dict(
-                min_silence_duration_ms=200,
-                speech_pad_ms=200
+        # Отправляем аудиофайл в Groq API для мгновенной транскрипции
+        with open(input_file, "rb") as audio_file:
+            transcript = groq_client.audio.transcriptions.create(
+                file=(input_file, audio_file.read()),
+                model="whisper-large-v3",  # Или "whisper-large-v3-turbo"
+                language="ru",
+                temperature=0.0,
+                response_format="text"
             )
-        )
         
-        text = " ".join([segment.text for segment in segments]).strip()
-        
-        garbage_phrases = ["савский трек", "тысячелетиями копал", "dimatorzok", "субтитры"]
-        if any(g in text.lower() for g in garbage_phrases):
-            text = ""
+        text = str(transcript).strip()
 
         if text:
             await message.reply(text)
         else:
-            await message.reply("Не удалось разобрать слова.")
+            await message.reply("Не удалось разобрать слова. Запись пустая.")
     except Exception as e:
-        await message.reply(f"Ошибка: {e}")
+        await message.reply(f"Ошибка при обращении к Groq API: {e}")
     finally:
         if os.path.exists(input_file):
             os.remove(input_file)
@@ -76,7 +74,7 @@ async def handle_audio(message: types.Message):
             pass
 
 async def main():
-    print("Бот запущен!")
+    print("Бот запущен и готов принимать аудио!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
