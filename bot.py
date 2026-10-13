@@ -64,14 +64,16 @@ async def handle_audio(message: types.Message):
         
         text = str(transcript).strip()
 
-        # Фильтруем шизу модели про Диму Торзока и прочий мусор
+        # Тотальный экстерминатус Димы Торзока во всех падежах и вариациях
         garbage_phrases = [
-            "димaторзок", "dimatorzok", "субтитры сделал", 
-            "савский трек", "тысячелетиями копал"
+            "dimatorzok", "диматорзок", "дима торзок", 
+            "субтитры сделал", "субтитры создавал", 
+            "продолжение следует", "савский трек"
         ]
+        
         text_lower = text.lower()
         if any(garbage in text_lower for garbage in garbage_phrases):
-            if len(text.split()) < 6:
+            if len(text.split()) < 8:
                 text = ""
             else:
                 for g in garbage_phrases:
@@ -97,4 +99,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-    
+        
