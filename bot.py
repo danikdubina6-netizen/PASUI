@@ -20,7 +20,7 @@ print("Модель успешно загружена!")
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer(
-        "Привет! Отправь мне голосовое, кружочек или аудио, и я выдам точный текст."
+        "Привет! Отправь мне голосовое, кружочек или чистый вокал, и я выдам точный текст."
     )
 
 @dp.message(F.voice | F.video_note | F.audio)
@@ -40,20 +40,22 @@ async def handle_audio(message: types.Message):
     await bot.download_file(file.file_path, input_file)
     
     try:
-        # Убрали initial_prompt, чтобы модель не галлюцинировала и не подгоняла текст под подсказки
         segments, _ = whisper_model.transcribe(
             input_file,
             beam_size=5,
             best_of=5,
             temperature=0.0,
             language="ru",
-            vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=300)
+            vad_filter=True,  # Включаем фильтр для точной поимки фраз чистого вокала
+            vad_parameters=dict(
+                min_silence_duration_ms=100,
+                speech_pad_ms=200
+            )
         )
         
         text = " ".join([segment.text for segment in segments]).strip()
         
-        # Отсекаем редкие системные мусорные артефакты
+        # Отсекаем редкие системные артефакты
         garbage_phrases = ["тысячелетиями копал я", "dimatorzok", "субтитры"]
         if any(g in text.lower() for g in garbage_phrases):
             text = ""
