@@ -64,6 +64,19 @@ async def handle_audio(message: types.Message):
         
         text = str(transcript).strip()
 
+        # Фильтруем шизу модели про Диму Торзока и прочий мусор
+        garbage_phrases = [
+            "димaторзок", "dimatorzok", "субтитры сделал", 
+            "савский трек", "тысячелетиями копал"
+        ]
+        text_lower = text.lower()
+        if any(garbage in text_lower for garbage in garbage_phrases):
+            if len(text.split()) < 6:
+                text = ""
+            else:
+                for g in garbage_phrases:
+                    text = text.replace(g, "").replace(g.capitalize(), "").strip()
+
         if text:
             await message.reply(text)
         else:
