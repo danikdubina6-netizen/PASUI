@@ -1,6 +1,7 @@
 import asyncio
 import os
 import sys
+import time
 import uuid
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
@@ -17,20 +18,25 @@ if not GROQ_API_KEY:
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Инициализируем клиента Groq для работы с облачным Whisper
 groq_client = Groq(api_key=GROQ_API_KEY)
 print("Groq API клиент успешно инициализирован!")
+
+START_TIME = time.time()
+MAX_UPTIME = 4.5 * 3600 
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer(
-        "Привет! Бот работает на сверхбыстром Groq API (Whisper Large V3). "
-        "Отправь голосовое или аудио, и я выдам точный текст!"
+        "Привет! Отправь мне голосовое, кружочек или аудио, и я выдам чистый текст."
     )
 
 @dp.message(F.voice | F.video_note | F.audio)
 async def handle_audio(message: types.Message):
-    status_msg = await message.answer("Молниеносная расшифровка через Groq...")
+    if time.time() - START_TIME > MAX_UPTIME:
+        await message.reply("Плановая перезагрузка. Секунду, скоро буду на связи.")
+        sys.exit(0)
+
+    status_msg = await message.answer("Расшифровываю...")
     
     if message.voice:
         file_id = message.voice.file_id
@@ -47,11 +53,10 @@ async def handle_audio(message: types.Message):
     await bot.download_file(file.file_path, input_file)
     
     try:
-        # Отправляем аудиофайл в Groq API для мгновенной транскрипции
         with open(input_file, "rb") as audio_file:
             transcript = groq_client.audio.transcriptions.create(
                 file=(input_file, audio_file.read()),
-                model="whisper-large-v3",  # Или "whisper-large-v3-turbo"
+                model="whisper-large-v3",
                 language="ru",
                 temperature=0.0,
                 response_format="text"
@@ -64,7 +69,7 @@ async def handle_audio(message: types.Message):
         else:
             await message.reply("Не удалось разобрать слова. Запись пустая.")
     except Exception as e:
-        await message.reply(f"Ошибка при обращении к Groq API: {e}")
+        await message.reply(f"Ошибка при обработке: {e}")
     finally:
         if os.path.exists(input_file):
             os.remove(input_file)
