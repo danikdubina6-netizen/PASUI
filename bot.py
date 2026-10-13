@@ -20,7 +20,7 @@ print("Модель успешно загружена!")
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer(
-        "Привет! Отправь мне голосовое, кружочек или чистый вокал, и я выдам точный текст."
+        "Привет! Отправь мне голосовое или вокал, и я выдам точный текст."
     )
 
 @dp.message(F.voice | F.video_note | F.audio)
@@ -46,7 +46,9 @@ async def handle_audio(message: types.Message):
             best_of=5,
             temperature=0.0,
             language="ru",
-            vad_filter=True,  # Включаем фильтр для точной поимки фраз чистого вокала
+            condition_on_previous_text=False,  # Отключаем накопление контекста, чтобы модель не подменяла слова по шаблонам
+            initial_prompt="Слушай сюда внимательно.",          # Подсказка для точного распознавания сложных оборотов речи
+            vad_filter=True,
             vad_parameters=dict(
                 min_silence_duration_ms=100,
                 speech_pad_ms=200
