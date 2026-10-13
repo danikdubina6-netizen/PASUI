@@ -14,20 +14,18 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-print("Загрузка сбалансированной модели Whisper (medium) для идеальной точности...")
-# Переходим на medium — она не галлюцинирует на живой речи и идеально ловит сленг
-whisper_model = WhisperModel("medium", device="cpu", compute_type="int8")
+print("Загрузка продвинутой модели Whisper Large V3 Turbo...")
+# Используем state-of-the-art модель: высокая скорость и максимальная точность без лишних слоев
+whisper_model = WhisperModel("large-v3-turbo", device="cpu", compute_type="int8")
 print("Модель успешно загружена!")
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    await message.answer(
-        "Привет! Отправь мне голосовое, и я выдам точный текст."
-    )
+    await message.answer("Привет! Отправь голосовое, и я расшифрую его на турбо-модели.")
 
 @dp.message(F.voice | F.video_note | F.audio)
 async def handle_audio(message: types.Message):
-    status_msg = await message.answer("Слушаю и расшифровываю...")
+    status_msg = await message.answer("Слушаю...")
     
     if message.voice:
         file_id = message.voice.file_id
@@ -50,8 +48,7 @@ async def handle_audio(message: types.Message):
             best_of=5,
             temperature=0.0,
             language="ru",
-            condition_on_previous_text=False,  # Отключаем накопление контекста, чтобы ошибки не тянулись дальше
-            vad_filter=True,
+            vad_filter=True,  # С turbo-моделью фильтр работает идеально и не режет нужные слова
             vad_parameters=dict(
                 min_silence_duration_ms=200,
                 speech_pad_ms=200
@@ -60,16 +57,16 @@ async def handle_audio(message: types.Message):
         
         text = " ".join([segment.text for segment in segments]).strip()
         
-        garbage_phrases = ["тысячелетиями копал я", "dimatorzok", "субтитры"]
+        garbage_phrases = ["савский трек", "тысячелетиями копал", "dimatorzok", "субтитры"]
         if any(g in text.lower() for g in garbage_phrases):
             text = ""
 
         if text:
             await message.reply(text)
         else:
-            await message.reply("Не удалось разобрать слова. Запись пустая или слишком тихая.")
+            await message.reply("Не удалось разобрать слова.")
     except Exception as e:
-        await message.reply(f"Ошибка при обработке: {e}")
+        await message.reply(f"Ошибка: {e}")
     finally:
         if os.path.exists(input_file):
             os.remove(input_file)
