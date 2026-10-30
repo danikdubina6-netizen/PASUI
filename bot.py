@@ -57,32 +57,39 @@ async def handle_audio(message: types.Message):
             transcript = groq_client.audio.transcriptions.create(
                 file=(input_file, audio_file.read()),
                 model="whisper-large-v3",
-                language="ru",
+                language="ru",  # Строго русский язык без перевода
                 temperature=0.0,
                 response_format="text"
             )
         
         text = str(transcript).strip()
 
-        # Тотальный экстерминатус Димы Торзока во всех падежах и вариациях
+        # Ультимативный фильтр для Димы Торзока, музыки и сопутствующего бреда
         garbage_phrases = [
             "dimatorzok", "диматорзок", "дима торзок", 
-            "субтитры сделал", "субтитры создавал", 
-            "продолжение следует", "савский трек"
+            "субтитры добавил", "субтитры сделал", "субтитры создавал", 
+            "продолжение следует", "савский трек",
+            "динамичная музыка", "музыка", "пауза", "аплодисменты"
         ]
         
         text_lower = text.lower()
-        if any(garbage in text_lower for garbage in garbage_phrases):
-            if len(text.split()) < 8:
-                text = ""
+        words = text.split()
+        garbage_count = sum(1 for g in garbage_phrases if g in text_lower)
+        
+        if garbage_count > 0 or len(words) < 4:
+            cleaned_text = text
+            for g in garbage_phrases:
+                cleaned_text = cleaned_text.lower().replace(g, "").strip()
+            
+            if len(cleaned_text.split()) < 3:
+                text = ""  # Защита от расшифровки чистого инструментала
             else:
-                for g in garbage_phrases:
-                    text = text.replace(g, "").replace(g.capitalize(), "").strip()
+                text = cleaned_text
 
         if text:
             await message.reply(text)
         else:
-            await message.reply("Не удалось разобрать слова. Запись пустая.")
+            await message.reply("🎵 [Музыкальный трек или пустой звук — слова не обнаружены]")
     except Exception as e:
         await message.reply(f"Ошибка при обработке: {e}")
     finally:
@@ -99,4 +106,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-        
+    
